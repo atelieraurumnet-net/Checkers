@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkers</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <h1>チェッカー</h1>
+        <div class="controls">
+          <label for="aiLevel">CPUレベル</label>
+          <select id="aiLevel" aria-label="CPUレベル">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+          <button id="reset" type="button">リセット</button>
+        </div>
+      </header>
+
+      <div class="panel">
+        <p id="status" aria-live="polite">黒の番です</p>
+      </div>
+
+      <div id="board" class="board" aria-label="チェッカー盤"></div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
