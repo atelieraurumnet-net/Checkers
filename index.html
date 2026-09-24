@@ -11,6 +11,18 @@
       <header class="header">
         <h1>チェッカー</h1>
         <div class="controls">
+          <label for="gameMode">対戦形式</label>
+          <select id="gameMode" aria-label="対戦形式">
+            <option value="cpu">CPU対戦</option>
+            <option value="pvp">PVP</option>
+          </select>
+
+          <label for="turnOrder">先攻</label>
+          <select id="turnOrder" aria-label="先攻">
+            <option value="human">自分</option>
+            <option value="cpu">CPU</option>
+          </select>
+
           <label for="aiLevel">CPUレベル</label>
           <select id="aiLevel" aria-label="CPUレベル">
             <option value="1">1</option>

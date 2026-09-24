@@ -3,11 +3,16 @@ const boardElement = document.getElementById("board");
 const statusElement = document.getElementById("status");
 const resetButton = document.getElementById("reset");
 const aiLevelSelect = document.getElementById("aiLevel");
+const gameModeSelect = document.getElementById("gameMode");
+const turnOrderSelect = document.getElementById("turnOrder");
 
 let aiTimer = null;
 let state = createInitialState();
 
 function createInitialState() {
+  const cpuStarts = turnOrderSelect?.value === "cpu";
+  const cpuColor = cpuStarts ? "black" : "red";
+
   return {
     board: createInitialBoard(),
     turn: "black",
@@ -15,6 +20,9 @@ function createInitialState() {
     legalMoves: [],
     winner: null,
     aiLevel: Number(aiLevelSelect?.value ?? 1),
+    mode: gameModeSelect?.value === "pvp" ? "pvp" : "cpu",
+    cpuColor,
+    humanColor: cpuColor === "black" ? "red" : "black",
   };
 }
 
@@ -64,7 +72,11 @@ function getAiSearchDepth(level) {
   return 5;
 }
 
-function evaluateBoard(board) {
+function getOpponentColor(color) {
+  return color === "black" ? "red" : "black";
+}
+
+function evaluateBoard(board, cpuColor = "black") {
   let score = 0;
 
   for (let row = 0; row < BOARD_SIZE; row += 1) {
@@ -78,34 +90,40 @@ function evaluateBoard(board) {
       const advancement = piece.color === "black" ? BOARD_SIZE - 1 - row : row;
       const advancementBonus = advancement * 0.4;
 
-      score += piece.color === "black" ? value + advancementBonus : -(value + advancementBonus);
+      if (piece.color === cpuColor) {
+        score += value + advancementBonus;
+      } else {
+        score -= value + advancementBonus;
+      }
     }
   }
 
-  const blackMoves = getLegalMoves(board, "black").length;
-  const redMoves = getLegalMoves(board, "red").length;
+  const opponentColor = getOpponentColor(cpuColor);
+  const cpuMoves = getLegalMoves(board, cpuColor).length;
+  const opponentMoves = getLegalMoves(board, opponentColor).length;
 
-  score += (blackMoves - redMoves) * 0.75;
+  score += (cpuMoves - opponentMoves) * 0.75;
 
   return score;
 }
 
-function minimax(board, turn, depth, alpha, beta) {
+function minimax(board, turn, depth, alpha, beta, cpuColor) {
   const legalMoves = getLegalMoves(board, turn);
+  const opponentColor = getOpponentColor(turn);
 
   if (depth === 0 || legalMoves.length === 0) {
     if (legalMoves.length === 0) {
-      return turn === "black" ? -100000 + depth : 100000 - depth;
+      return turn === cpuColor ? -100000 + depth : 100000 - depth;
     }
 
-    return evaluateBoard(board);
+    return evaluateBoard(board, cpuColor);
   }
 
-  if (turn === "black") {
+  if (turn === cpuColor) {
     let bestScore = -Infinity;
 
     for (const move of legalMoves) {
-      const score = minimax(move.board, "red", depth - 1, alpha, beta);
+      const score = minimax(move.board, opponentColor, depth - 1, alpha, beta, cpuColor);
       bestScore = Math.max(bestScore, score);
       alpha = Math.max(alpha, bestScore);
 
@@ -120,7 +138,7 @@ function minimax(board, turn, depth, alpha, beta) {
   let bestScore = Infinity;
 
   for (const move of legalMoves) {
-    const score = minimax(move.board, "black", depth - 1, alpha, beta);
+    const score = minimax(move.board, opponentColor, depth - 1, alpha, beta, cpuColor);
     bestScore = Math.min(bestScore, score);
     beta = Math.min(beta, bestScore);
 
@@ -132,8 +150,8 @@ function minimax(board, turn, depth, alpha, beta) {
   return bestScore;
 }
 
-function chooseAiMove(board, level) {
-  const legalMoves = getLegalMoves(board, "black");
+function chooseAiMove(board, level, cpuColor = "black") {
+  const legalMoves = getLegalMoves(board, cpuColor);
 
   if (legalMoves.length === 0) {
     return null;
@@ -148,7 +166,7 @@ function chooseAiMove(board, level) {
   if (level <= 2) {
     const scoredMoves = legalMoves.map((move) => ({
       move,
-      score: evaluateBoard(move.board),
+      score: evaluateBoard(move.board, cpuColor),
     }));
 
     const bestScore = Math.max(...scoredMoves.map(({ score }) => score));
@@ -158,9 +176,10 @@ function chooseAiMove(board, level) {
 
   let bestMove = legalMoves[0];
   let bestScore = -Infinity;
+  const opponentColor = getOpponentColor(cpuColor);
 
   for (const move of legalMoves) {
-    const score = minimax(move.board, "red", depth - 1, -Infinity, Infinity);
+    const score = minimax(move.board, opponentColor, depth - 1, -Infinity, Infinity, cpuColor);
     if (score > bestScore) {
       bestScore = score;
       bestMove = move;
@@ -170,24 +189,29 @@ function chooseAiMove(board, level) {
   return bestMove;
 }
 
-function scheduleAiTurn() {
+function clearAiTurn() {
   if (aiTimer) {
     clearTimeout(aiTimer);
+    aiTimer = null;
   }
+}
 
-  if (state.turn !== "black" || state.winner) {
+function scheduleAiTurn() {
+  clearAiTurn();
+
+  if (state.mode !== "cpu" || state.turn !== state.cpuColor || state.winner) {
     return;
   }
 
   aiTimer = setTimeout(() => {
-    const move = chooseAiMove(state.board, state.aiLevel);
+    const move = chooseAiMove(state.board, state.aiLevel, state.cpuColor);
 
     if (move) {
       applyMove(move);
       return;
     }
 
-    state.winner = "red";
+    state.winner = state.humanColor;
     render();
   }, 300);
 }
@@ -406,7 +430,7 @@ function applyMove(move) {
 
   render();
 
-  if (state.turn === "black" && !state.winner) {
+  if (state.turn === state.cpuColor && !state.winner) {
     scheduleAiTurn();
   }
 }
@@ -433,8 +457,18 @@ function hasAnyMoves(board, color) {
 }
 
 function render() {
+  if (gameModeSelect) {
+    gameModeSelect.value = state.mode;
+  }
+
   if (aiLevelSelect) {
     aiLevelSelect.value = String(state.aiLevel);
+    aiLevelSelect.disabled = state.mode === "pvp";
+  }
+
+  if (turnOrderSelect) {
+    turnOrderSelect.value = state.cpuColor === "black" ? "cpu" : "human";
+    turnOrderSelect.disabled = state.mode === "pvp";
   }
 
   boardElement.innerHTML = "";
@@ -475,7 +509,7 @@ function render() {
     statusElement.textContent = `${winnerName}の勝ちです。`;
   } else {
     const turnName = state.turn === "black" ? "黒" : "赤";
-    const suffix = state.turn === "black" ? `（CPU Lv.${state.aiLevel}）` : "";
+    const suffix = state.mode === "cpu" && state.turn === state.cpuColor ? `（CPU Lv.${state.aiLevel}）` : "";
     statusElement.textContent = `${turnName}の番です${suffix}`;
   }
 }
@@ -489,7 +523,7 @@ boardElement.addEventListener("click", (event) => {
   const row = Number(square.dataset.row);
   const col = Number(square.dataset.col);
 
-  if (state.winner || state.turn === "black") {
+  if (state.winner || (state.mode === "cpu" && state.turn === state.cpuColor)) {
     return;
   }
 
@@ -533,6 +567,26 @@ if (aiLevelSelect) {
   aiLevelSelect.addEventListener("change", () => {
     state.aiLevel = Number(aiLevelSelect.value);
     scheduleAiTurn();
+  });
+}
+
+if (turnOrderSelect) {
+  turnOrderSelect.addEventListener("change", () => {
+    state = createInitialState();
+    render();
+    scheduleAiTurn();
+  });
+}
+
+if (gameModeSelect) {
+  gameModeSelect.addEventListener("change", () => {
+    state.mode = gameModeSelect.value;
+    clearAiTurn();
+    render();
+
+    if (state.mode === "cpu") {
+      scheduleAiTurn();
+    }
   });
 }
 
